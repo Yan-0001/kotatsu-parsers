@@ -241,7 +241,7 @@ internal abstract class YuriGardenParser(
 		// Testing...
 		val pwdInput: String? = if (json.optBoolean("locked", false)) {
 			val inputKey = "chapter_${chapter.url}_password"
-			val cached = context.getUserInput(inputKey)
+			val cached = context.getConfig(source)[ConfigKey.UserInput(inputKey)]
 			if (cached.isNullOrEmpty()) {
 				throw InputRequiredException(
 					source = source,
