@@ -238,21 +238,16 @@ internal abstract class YuriGardenParser(
 
 	override suspend fun getPages(chapter: MangaChapter): List<MangaPage> {
 		val json = webClient.httpGet("https://$apiSuffix/chapters/${chapter.url}").parseJson()
-		// Testing...
-		val pwdInput: String? = if (json.optBoolean("encrypted", false)) {
-			val inputKey = "chapter_${chapter.url}_password"
-			val cached = context.getConfig(source)[ConfigKey.UserInput(inputKey)]
-			if (cached.isNullOrEmpty()) {
+		// Testing, fake condition...
+		val inputKey = "chapter_${chapter.url}_password"
+		val pwdInput = context.getConfig(source)[ConfigKey.UserInput(inputKey)]
+			if (pwdInput.isNullOrEmpty()) {
 				throw InputRequiredException(
 					source = source,
 					message = "Chương này yêu cầu mật khẩu. Vui lòng nhập để tiếp tục.",
 					key = inputKey,
 				)
 			}
-			cached
-		} else {
-			null
-		}
 
 		val pages = json.getJSONArray("pages").asTypedList<JSONObject>()
 
