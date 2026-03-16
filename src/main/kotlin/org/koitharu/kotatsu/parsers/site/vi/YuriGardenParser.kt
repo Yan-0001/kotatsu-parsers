@@ -17,6 +17,7 @@ import org.koitharu.kotatsu.parsers.bitmap.Bitmap
 import org.koitharu.kotatsu.parsers.bitmap.Rect
 import org.koitharu.kotatsu.parsers.config.ConfigKey
 import org.koitharu.kotatsu.parsers.core.PagedMangaParser
+import org.koitharu.kotatsu.parsers.exception.InputRequiredException
 import org.koitharu.kotatsu.parsers.network.UserAgents
 import org.koitharu.kotatsu.parsers.model.*
 import org.koitharu.kotatsu.parsers.network.CommonHeaders
@@ -240,6 +241,13 @@ internal abstract class YuriGardenParser(
 		val pages = json.getJSONArray("pages").asTypedList<JSONObject>()
 
 		return pages.mapIndexed { index, page ->
+			// Testing...
+			if (1 != 0) throw InputRequiredException(
+				source,
+				"Nhập mật khẩu cho chương này",
+				cause = IllegalStateException("Password required!")
+			)
+
 			val rawUrl = page.getString("url").replace("_credit", "")
 
 			if (rawUrl.startsWith("comics")) {
