@@ -6,7 +6,7 @@ on:
             - master
 
 jobs:
-    trigger-jitpack:
+    trigger:
         runs-on: ubuntu-latest
         steps:
             -   name: Trigger JitPack build 🚀
