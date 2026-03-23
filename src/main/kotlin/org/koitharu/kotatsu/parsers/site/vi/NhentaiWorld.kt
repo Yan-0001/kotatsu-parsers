@@ -1,8 +1,9 @@
 package org.koitharu.kotatsu.parsers.site.vi
 
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import okhttp3.Headers
 import org.json.JSONObject
-import org.koitharu.kotatsu.parsers.Broken
 import org.koitharu.kotatsu.parsers.MangaLoaderContext
 import org.koitharu.kotatsu.parsers.MangaSourceParser
 import org.koitharu.kotatsu.parsers.config.ConfigKey
@@ -19,13 +20,13 @@ import java.net.URLDecoder
 import java.text.SimpleDateFormat
 import java.util.*
 
-@Broken("Website is not responding")
 @MangaSourceParser("NHENTAIWORLD", "Nhentai World", "vi", ContentType.HENTAI)
 internal class NhentaiWorld(context: MangaLoaderContext) :
 	PagedMangaParser(context, MangaParserSource.NHENTAIWORLD, 24) {
 
-    private val apiDomain = "nhentaiclub.cyou"
-    override val configKeyDomain = ConfigKey.Domain("nhentaiclub.space")
+    private val apiDomain = "vvcz.online"
+	private val cdnDomain = "vvcz.store"
+    override val configKeyDomain = ConfigKey.Domain("nhentaiclub.site")
 
 	override fun onCreateConfig(keys: MutableCollection<ConfigKey<*>>) {
 		super.onCreateConfig(keys)
@@ -115,7 +116,6 @@ internal class NhentaiWorld(context: MangaLoaderContext) :
 		return res.getJSONArray("data").mapJSONNotNull { ja ->
 			val id = ja.getLong("id")
 			val url = id.toString()
-            val cdn = getCDNDomain(url)
 			Manga(
 				id = generateUid(id),
 				title = ja.getString("name"),
@@ -124,7 +124,7 @@ internal class NhentaiWorld(context: MangaLoaderContext) :
 				publicUrl = "/g/$id".toAbsoluteUrl(domain),
 				rating = RATING_UNKNOWN,
 				contentRating = ContentRating.ADULT,
-				coverUrl = "https://$cdn/$id/thumbnail.jpg",
+				coverUrl = "https://$cdnDomain/$id/thumbnail.jpg",
 				tags = emptySet(),
 				state = null,
 				authors = emptySet(),
@@ -220,9 +220,10 @@ internal class NhentaiWorld(context: MangaLoaderContext) :
 	override suspend fun getPages(chapter: MangaChapter): List<MangaPage> {
 		val params = parseQueryParams(chapter.url)
 
-		val name = URLDecoder.decode(params["name"], "UTF-8")
-			?: chapter.url.substringAfter("name=").substringBefore("&language")
-				.ifBlank { throw ParseException("Cant get chapter name", chapter.url) }
+		val name = withContext(Dispatchers.IO) {
+			URLDecoder.decode(params["name"], "UTF-8")
+		} ?: chapter.url.substringAfter("name=").substringBefore("&language")
+			.ifBlank { throw ParseException("Cant get chapter name", chapter.url) }
 
 		val language = params["language"]
 			?: chapter.url.substringAfter("language=").substringBefore("&pictures")
@@ -238,9 +239,8 @@ internal class NhentaiWorld(context: MangaLoaderContext) :
 				throw ParseException("Cant get manga ID for images", chapter.url)
 			}
 
-		val imgDomain = getCDNDomain(mangaId)
 		return (1..pictures).map { pageNumber ->
-			val imgUrl = "https://$imgDomain/$mangaId/$language/$name/$pageNumber.jpg"
+			val imgUrl = "https://$cdnDomain/$mangaId/$language/$name/$pageNumber.jpg"
 			MangaPage(
 				id = generateUid(imgUrl),
 				url = imgUrl,
@@ -251,7 +251,7 @@ internal class NhentaiWorld(context: MangaLoaderContext) :
 	}
 
     private suspend fun fetchTags(): Set<MangaTag> {
-        val url = "https://$domain/_next/static/chunks/130-5a83ead201ba7c6a.js"
+        val url = "https://$domain/_next/static/chunks/130-faefdfbab5b07bdc.js"
         val response = webClient.httpGet(url).parseRaw()
 
         val subString = response
@@ -265,15 +265,6 @@ internal class NhentaiWorld(context: MangaLoaderContext) :
             MangaTag(label, label, source)
         }
     }
-
-	private fun getCDNDomain(mangaId: String): String {
-		val firstDigit = mangaId.firstOrNull()?.digitToIntOrNull() ?: 0
-		return when {
-			firstDigit < 4 -> "i7.nhentaiclub.shop"
-			firstDigit < 8 -> "i3.nhentaiclub.shop"
-			else -> "i1.nhentaiclub.shop"
-		}
-	}
 
 	private fun parseChapterNumber(name: String, index: Int): Float {
 		if (name.contains("oneshot", ignoreCase = true)) return 0f
