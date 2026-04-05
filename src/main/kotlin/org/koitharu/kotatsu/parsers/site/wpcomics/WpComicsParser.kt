@@ -340,21 +340,21 @@ internal abstract class WpComicsParser(
 		}
 	}
 
-    protected fun Element.findImageUrl(): String? {
-        val priorityKeys = listOf("src", "data-src", "data-original", "data-original-src")
+	// need a better function to handle them
+	protected fun Element.findImageUrl(): String? {
+		val priorityKeys = listOf(
+			"data-src",
+			"data-original",
+			"data-original-src",
+			"src",
+		)
+		for (key in priorityKeys) {
+			val value = attr(key).trim()
+			if (value.startsWith("http")) {
+				return value
+			}
+		}
 
-        for (key in priorityKeys) {
-            val value = attr(key).trim()
-            if (value.isNotBlank() && value.toHttpUrlOrNull() != null) {
-                return value
-            }
-        }
-
-        val fallback = attributes().firstOrNull { attr ->
-            val value = attr.value.trim()
-            value.toHttpUrlOrNull() != null
-        }
-
-        return fallback?.value
-    }
+		return null
+	}
 }
