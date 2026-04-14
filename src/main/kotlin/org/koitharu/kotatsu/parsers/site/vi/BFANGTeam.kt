@@ -143,7 +143,7 @@ internal class BFANGTeam (context: MangaLoaderContext) :
 			doc = webClient.httpGet(nextUrl).parseHtml()
 		}
 
-		return chapters.distinctBy { it.number }
+		return chapters.sortedBy { it.number }
 	}
 
 	private fun parseChapters(doc: Document): List<MangaChapter> =
