@@ -17,7 +17,6 @@ import org.koitharu.kotatsu.parsers.bitmap.Bitmap
 import org.koitharu.kotatsu.parsers.bitmap.Rect
 import org.koitharu.kotatsu.parsers.config.ConfigKey
 import org.koitharu.kotatsu.parsers.core.PagedMangaParser
-import org.koitharu.kotatsu.parsers.exception.InputRequiredException
 import org.koitharu.kotatsu.parsers.network.UserAgents
 import org.koitharu.kotatsu.parsers.model.*
 import org.koitharu.kotatsu.parsers.network.CommonHeaders
@@ -238,22 +237,9 @@ internal abstract class YuriGardenParser(
 
 	override suspend fun getPages(chapter: MangaChapter): List<MangaPage> {
 		val json = webClient.httpGet("https://$apiSuffix/chapters/${chapter.url}").parseJson()
-		// Testing, fake condition...
-		val inputKey = "chapter_${chapter.url}_password"
-		val pwdInput = context.getConfig(source)[ConfigKey.UserInput(inputKey)]
-			if (pwdInput.isNullOrEmpty()) {
-				throw InputRequiredException(
-					source = source,
-					message = "Chương này yêu cầu mật khẩu. Vui lòng nhập để tiếp tục.",
-					key = inputKey,
-				)
-			}
-
 		val pages = json.getJSONArray("pages").asTypedList<JSONObject>()
-
 		return pages.mapIndexed { index, page ->
 			val rawUrl = page.getString("url").replace("_credit", "")
-
 			if (rawUrl.startsWith("comics")) {
 				val key = page.optString("key", null)
 				val url = "https://$cdnSuffix/$rawUrl".toHttpUrl().newBuilder().apply {
@@ -261,7 +247,7 @@ internal abstract class YuriGardenParser(
 						fragment("KEY=$key")
 					}
 				}
-
+				
 				MangaPage(
 					id = generateUid(index.toLong()),
 					url = url.build().toString(),
@@ -279,8 +265,6 @@ internal abstract class YuriGardenParser(
 			}
 		}
 	}
-
-
 
 	override fun intercept(chain: Interceptor.Chain): Response {
 		val response = chain.proceed(chain.request())
