@@ -1,4 +1,4 @@
-package org.koitharu.kotatsu.parsers.site.en
+package org.koitharu.kotatsu.parsers.site.en.comix
 
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
@@ -235,12 +235,21 @@ internal class Comix(context: MangaLoaderContext) :
 	// -------------------------
 	// Chapters
 	// -------------------------
-	private suspend fun getChapters(hashId: String): List<MangaChapter> = coroutineScope {
-		val firstPageUrl = "$apiBaseUrl/manga/$hashId/chapters".toHttpUrl().newBuilder()
+	private fun chaptersRequestUrl(hashId: String, page: Int) = run {
+		val path = "/manga/$hashId/chapters"
+		val time = 1L
+		val hashToken = ComixHash.generateHash(path = path, time = time)
+		"$apiBaseUrl$path".toHttpUrl().newBuilder()
 			.addQueryParameter("order[number]", "desc")
 			.addQueryParameter("limit", "100")
-			.addQueryParameter("page", "1")
+			.addQueryParameter("page", page.toString())
+			.addQueryParameter("time", time.toString())
+			.addQueryParameter("_", hashToken)
 			.build()
+	}
+
+	private suspend fun getChapters(hashId: String): List<MangaChapter> = coroutineScope {
+		val firstPageUrl = chaptersRequestUrl(hashId, 1)
 
 		val firstResp = runCatching { webClient.httpGet(firstPageUrl).parseJson() }.getOrNull()
 			?: return@coroutineScope emptyList()
@@ -258,11 +267,7 @@ internal class Comix(context: MangaLoaderContext) :
 		if (totalPages > 1) {
 			val deferreds = (2..totalPages).map {
 				async {
-					val url = "$apiBaseUrl/manga/$hashId/chapters".toHttpUrl().newBuilder()
-						.addQueryParameter("order[number]", "desc")
-						.addQueryParameter("limit", "100")
-						.addQueryParameter("page", it.toString())
-						.build()
+					val url = chaptersRequestUrl(hashId, it)
 					runCatching {
 							webClient.httpGet(url).parseJson().optJSONObject("result")?.optJSONArray("items")
 						}.getOrNull()
@@ -280,6 +285,7 @@ internal class Comix(context: MangaLoaderContext) :
 			if (num.isNaN()) return@mapNotNull null
 
 			val chapterId = it.optLong("chapter_id", 0L)
+			if (chapterId == 0L) return@mapNotNull null
 			val number = num.toFloat()
 			val name = it.optString("name", "").nullIfEmpty()
 			val createdAt = it.optLong("created_at", 0L)
@@ -300,14 +306,14 @@ internal class Comix(context: MangaLoaderContext) :
 				if (scanlatorName != null) append(" [").append(scanlatorName).append("]")
 			}.trim()
 
-			val uid = if (chapterId != 0L) "$chapterId-$groupId" else UUID.randomUUID().toString()
+			val uid = "$chapterId-$groupId"
 
 			MangaChapter(
 				id = generateUid(uid),
 				title = title.ifBlank { "Chapter $number" },
 				number = number,
 				volume = it.optString("volume", "0").toIntOrNull() ?: 0,
-				url = "/title/$hashId/dummy-slug/$chapterId-chapter-${number.toInt()}",
+				url = "/title/$hashId/$chapterId",
 				uploadDate = createdAt * 1000L,
 				source = source,
 				scanlator = scanlatorName,

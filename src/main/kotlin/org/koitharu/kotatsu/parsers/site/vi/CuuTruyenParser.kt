@@ -15,6 +15,7 @@ import org.koitharu.kotatsu.parsers.bitmap.Rect
 import org.koitharu.kotatsu.parsers.config.ConfigKey
 import org.koitharu.kotatsu.parsers.core.PagedMangaParser
 import org.koitharu.kotatsu.parsers.model.*
+import org.koitharu.kotatsu.parsers.network.CloudFlareHelper
 import org.koitharu.kotatsu.parsers.network.UserAgents
 import org.koitharu.kotatsu.parsers.util.*
 import org.koitharu.kotatsu.parsers.util.json.*
@@ -30,8 +31,8 @@ internal class CuuTruyenParser(context: MangaLoaderContext) :
 
 	override val configKeyDomain = ConfigKey.Domain(
 		"cuutruyen.net",
-		"nettrom.com",
 		"hetcuutruyen.net",
+		"nettrom.com",
 	)
 
     private val preferredServerKey = ConfigKey.PreferredImageServer(
@@ -71,7 +72,8 @@ internal class CuuTruyenParser(context: MangaLoaderContext) :
 	}
 
 	override suspend fun getListPage(page: Int, order: SortOrder, filter: MangaListFilter): List<Manga> {
-        val url = buildString {
+        // Move to urlBuilder
+		val url = buildString {
             if (!filter.query.isNullOrEmpty() || filter.tags.isNotEmpty() || filter.states.isNotEmpty()) {
                 append("/mangas/search?q=")
                 if (!filter.query.isNullOrEmpty()) {
@@ -135,14 +137,20 @@ internal class CuuTruyenParser(context: MangaLoaderContext) :
             append(pageSize)
         }
 
-        // prevent throw e in app
-        val json = runCatching {
-            webClient.httpGet("https://$domain$apiSuffix$url").parseJson()
-        }.getOrNull() ?: return emptyList()
+		val fullUrl = "https://$domain$apiSuffix$url"
+		val response = webClient.httpGet(fullUrl)
 
+		val protection = CloudFlareHelper.checkResponseForProtection(response.copy())
+		if (protection != CloudFlareHelper.PROTECTION_NOT_DETECTED) {
+			response.close()
+			context.requestBrowserAction(this, fullUrl)
+		}
+
+        val json = response.parseJson()
         val data = json.optJSONArray("data")
             ?: json.getJSONObject("data").getJSONArray("new_chapter_mangas")
             ?: json.getJSONObject("data").getJSONArray("mangas")
+			?: return emptyList()
 
 		return data.mapJSON { jo ->
 			val author = jo.getStringOrNull("author_name")

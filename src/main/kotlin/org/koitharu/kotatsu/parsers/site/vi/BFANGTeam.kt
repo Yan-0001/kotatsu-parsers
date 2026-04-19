@@ -1,9 +1,10 @@
 package org.koitharu.kotatsu.parsers.site.vi
 
+import org.jsoup.nodes.Document
 import org.koitharu.kotatsu.parsers.MangaLoaderContext
 import org.koitharu.kotatsu.parsers.MangaSourceParser
 import org.koitharu.kotatsu.parsers.config.ConfigKey
-import org.koitharu.kotatsu.parsers.core.SinglePageMangaParser
+import org.koitharu.kotatsu.parsers.core.PagedMangaParser
 import org.koitharu.kotatsu.parsers.model.ContentRating
 import org.koitharu.kotatsu.parsers.model.Manga
 import org.koitharu.kotatsu.parsers.model.MangaChapter
@@ -30,9 +31,9 @@ import java.text.SimpleDateFormat
 import java.util.EnumSet
 import java.util.Locale
 
-@MangaSourceParser("BFANGTEAM", "BFANG Team (Động Mòe)", "vi")
+@MangaSourceParser("BFANGTEAM", "Moè Truyện", "vi")
 internal class BFANGTeam (context: MangaLoaderContext) :
-	SinglePageMangaParser(context, MangaParserSource.BFANGTEAM) {
+	PagedMangaParser(context, MangaParserSource.BFANGTEAM, 24) {
 
 	override val configKeyDomain = ConfigKey.Domain("moetruyen.net")
 
@@ -53,21 +54,21 @@ internal class BFANGTeam (context: MangaLoaderContext) :
 		)
 	}
 
-	override suspend fun getList(order: SortOrder, filter: MangaListFilter): List<Manga> {
+	override suspend fun getListPage(page: Int, order: SortOrder, filter: MangaListFilter): List<Manga> {
 		val url = urlBuilder().addPathSegment("manga")
 
 		if (!filter.query.isNullOrEmpty()) {
-			url.addQueryParameter("q",
-				filter.query.splitByWhitespace().joinToString(separator = "+") { it }
-			)
+			url.addEncodedQueryParameter("q", filter.query)
 		}
 
+		// todo: need to use data-genre (num) instead of genre name
 		if (filter.tags.isNotEmpty()) {
 			filter.tags.forEach {
 				url.addQueryParameter("include", it.key)
 			}
 		}
 
+		// todo: need to use data-genre (num) instead of genre name
 		if (filter.tagsExclude.isNotEmpty()) {
 			filter.tagsExclude.forEach {
 				url.addQueryParameter("exclude", it.key)
@@ -78,6 +79,11 @@ internal class BFANGTeam (context: MangaLoaderContext) :
 			url.addQueryParameter("q",
 				filter.author.splitByWhitespace().joinToString(separator = "+") { it }
 			)
+		}
+
+		// paging
+		if (page > 1) {
+			url.addQueryParameter("page", page.toString())
 		}
 
 		val request = webClient.httpGet(url.build()).parseHtml()
@@ -108,46 +114,54 @@ internal class BFANGTeam (context: MangaLoaderContext) :
 	}
 
 	override suspend fun getDetails(manga: Manga): Manga {
-		val response = webClient.httpGet(manga.url.toAbsoluteUrl(domain)).parseHtml()
-		val div = response.select(".detail-info.reveal")
-		val author = div.select("p.manga-author a.inline-link").map { it.text() }.toSet()
-		val altTitles = div.select("p.note").map { it.text().substringAfter("Tên khác: ") }.toSet()
-		val description = div.select(".manga-description p span").text()
+		val doc = webClient.httpGet(manga.url.toAbsoluteUrl(domain)).parseHtml()
+		val div = doc.select(".detail-info.reveal")
 		val isNsfw = div.select(".chips a.chip").any { it.text() == "Adult" }
-		val tags = div.select(".chips a.chip").map {
-			val tag = it.text()
-			MangaTag(
-				title = tag,
-				key = tag.urlEncoded(),
-				source = source,
-			)
-		}.toSet()
 
 		return manga.copy(
-			authors = author,
-			altTitles = altTitles,
-			chapters = response.select("li.chapter").mapChapters(true) { i, li ->
-				val chapterMain = li.select("a .chapter-main .chapter-title-row")
-				val chapNum = chapterMain.select("span.chapter-num")
-					.text().substringAfter("Ch. ").toFloatOrNull() ?: (i + 1).toFloat()
-				val chapTitle = chapterMain.select("span.chapter-title").text()
-				MangaChapter(
-					id = generateUid(chapTitle),
-					title = chapTitle,
-					number = chapNum,
-					volume = 0,
-					url = li.select("a").attr("href").toAbsoluteUrl(domain),
-					scanlator = li.select("span.chapter-sub-text").text(),
-					uploadDate = parseChapterDate(li.select("span.chapter-time").text()),
-					branch = null,
-					source = source,
-				)
-			},
+			authors = div.select("p.manga-author a.inline-link").map { it.text() }.toSet(),
+			altTitles = div.select("p.note").map { it.text().substringAfter("Tên khác: ") }.toSet(),
+			description = div.select(".manga-description p span").text(),
 			contentRating = if (isNsfw) ContentRating.ADULT else null,
-			description = description,
-			tags = tags,
+			tags = div.select(".chips a.chip").map {
+				MangaTag(title = it.text(), key = it.text().urlEncoded(), source = source)
+			}.toSet(),
+			chapters = fetchAllChapters(manga.url.toAbsoluteUrl(domain), doc),
 		)
 	}
+
+	private suspend fun fetchAllChapters(startUrl: String, firstPage: Document): List<MangaChapter> {
+		val chapters = mutableListOf<MangaChapter>()
+		val visited = mutableSetOf(startUrl)
+		var doc = firstPage
+
+		while (true) {
+			chapters += parseChapters(doc)
+			val nextUrl = doc.selectFirst("nav[aria-label*='Phân trang chương'] a[aria-label='Trang chương sau']:not(.is-disabled)")
+				?.absUrl("href")?.takeIf { it.isNotEmpty() && it != "#" && visited.add(it) }
+				?: break
+			doc = webClient.httpGet(nextUrl).parseHtml()
+		}
+
+		return chapters.sortedBy { it.number }
+	}
+
+	private fun parseChapters(doc: Document): List<MangaChapter> =
+		doc.select("li.chapter").mapChapters(true) { i, li ->
+			val row = li.select("a .chapter-main .chapter-title-row")
+			val title = row.select("span.chapter-title").text()
+			MangaChapter(
+				id = generateUid(title),
+				title = title,
+				number = row.select("span.chapter-num").text().substringAfter("Ch. ").toFloatOrNull() ?: (i + 1).toFloat(),
+				volume = 0,
+				url = li.select("a").attr("href").toAbsoluteUrl(domain),
+				scanlator = li.selectFirst("span.chapter-sub-text")?.text(),
+				uploadDate = parseChapterDate(li.select("span.chapter-time").text()),
+				branch = null,
+				source = source,
+			)
+		}
 
 	override suspend fun getPages(chapter: MangaChapter): List<MangaPage> {
 		val response = webClient.httpGet(chapter.url).parseHtml()

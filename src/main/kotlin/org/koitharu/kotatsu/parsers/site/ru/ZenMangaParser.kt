@@ -354,7 +354,6 @@ internal class ZenMangaParser(context: MangaLoaderContext) :
 		if (protection != CloudFlareHelper.PROTECTION_NOT_DETECTED) {
 			response.close()
 			context.requestBrowserAction(this, fullUrl)
-			return null
 		}
 
 		val responseHtml = response.parseHtml()

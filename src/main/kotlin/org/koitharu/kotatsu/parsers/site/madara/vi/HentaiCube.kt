@@ -5,6 +5,7 @@ import org.koitharu.kotatsu.parsers.MangaLoaderContext
 import org.koitharu.kotatsu.parsers.MangaSourceParser
 import org.koitharu.kotatsu.parsers.exception.ParseException
 import org.koitharu.kotatsu.parsers.model.*
+import org.koitharu.kotatsu.parsers.network.CommonHeaders
 import org.koitharu.kotatsu.parsers.site.madara.MadaraParser
 import org.koitharu.kotatsu.parsers.util.*
 import org.koitharu.kotatsu.parsers.util.suspendlazy.getOrNull
@@ -16,9 +17,12 @@ internal class HentaiCube(context: MangaLoaderContext) :
 	MadaraParser(context, MangaParserSource.HENTAICUBE, "hentaicube.xyz") {
 
 	override val datePattern = "dd/MM/yyyy"
-	override val postReq = true
 	override val authorSearchSupported = true
 	override val postDataReq = "action=manga_views&manga="
+
+	override fun getRequestHeaders() = super.getRequestHeaders().newBuilder()
+		.add(CommonHeaders.ORIGIN, "https://$domain")
+		.build()
 
 	private val availableTags = suspendLazy(initializer = ::fetchTags)
 
@@ -127,6 +131,15 @@ internal class HentaiCube(context: MangaLoaderContext) :
 		return allTags.find {
 			it.title.trim().equals(title, ignoreCase = true) // try to search with trim
 		}
+	}
+
+	override suspend fun getDetails(manga: Manga): Manga {
+		val result = super.getDetails(manga)
+		val doc = webClient.httpGet(result.publicUrl).parseHtml()
+
+		return result.copy(
+			title = doc.selectFirst("h1")?.ownText() ?: result.title,
+		)
 	}
 
 	override suspend fun getPages(chapter: MangaChapter): List<MangaPage> {

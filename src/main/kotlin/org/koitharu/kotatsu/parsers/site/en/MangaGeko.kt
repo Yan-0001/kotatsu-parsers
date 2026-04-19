@@ -166,7 +166,7 @@ internal class MangaGeko(context: MangaLoaderContext) :
 			.ifEmpty { parseChapters(detailsDoc) }
 			.distinctBy { it.url }
 
-		return chapters.mapIndexed { i, chapter ->
+		return chapters.mapChapters(reversed = true) { i, chapter ->
 			chapter.copy(number = (chapters.size - i).toFloat())
 		}
 	}

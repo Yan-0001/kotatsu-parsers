@@ -15,13 +15,8 @@ import org.koitharu.kotatsu.parsers.util.toRelativeUrl
 
 @MangaSourceParser("KIRYUU", "Kiryuu", "id")
 internal class Kiryuu(context: MangaLoaderContext) :
-	NatsuParser(context, MangaParserSource.KIRYUU, pageSize = 24) {
-	override val configKeyDomain = ConfigKey.Domain(
-		"kiryuu03.com",
-		"kiryuu04.com",
-		"kiryuu05.com",
-		"kiryuu.id",
-	)
+	NatsuParser(context, MangaParserSource.KIRYUU, 24) {
+	override val configKeyDomain = ConfigKey.Domain("v4.kiryuu.to")
 
 	override suspend fun getPages(chapter: MangaChapter): List<MangaPage> {
 		val doc = webClient.httpGet(chapter.url.toAbsoluteUrl(domain)).parseHtml()

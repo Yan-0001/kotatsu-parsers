@@ -18,6 +18,10 @@ ksp {
     arg("summaryOutputDir", "${projectDir}/.github")
 }
 
+tasks.jar {
+	archiveFileName.set("kotatsu-parsers.jar")
+}
+
 tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile>().configureEach {
     compilerOptions {
         freeCompilerArgs.addAll(

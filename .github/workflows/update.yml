@@ -1,10 +1,6 @@
-name: Update summary for PRs
+name: Update summary (for PRs)
 
 on:
-    workflow_dispatch:
-    push:
-        branches:
-            - master
     pull_request_target:
         paths:
             - 'src/main/kotlin/org/koitharu/kotatsu/parsers/**'

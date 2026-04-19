@@ -47,9 +47,6 @@ internal class HentaiOrigines(context: MangaLoaderContext) :
 		}
 	}
 
-	@Volatile
-	private var preferAdminAjaxChapters = false
-
 	override fun getRequestHeaders(): Headers = super.getRequestHeaders().newBuilder()
 		.set("Referer", "https://$domain/")
 		.set("Origin", "https://$domain")
@@ -60,7 +57,7 @@ internal class HentaiOrigines(context: MangaLoaderContext) :
 		synchronized(chaptersCache) {
 			chaptersCache[cacheKey]?.let { return it }
 		}
-		val chapters = parseChapterList(doc.body().select(selectChapter), sourceOrderFallback = true)
+		val chapters = parseChapterList(selectChapterItems(doc), sourceOrderFallback = true)
 		if (chapters.isNotEmpty()) {
 			synchronized(chaptersCache) {
 				chaptersCache[cacheKey] = chapters
@@ -76,13 +73,13 @@ internal class HentaiOrigines(context: MangaLoaderContext) :
 			chaptersCache[cacheKey]?.let { return it }
 		}
 
-		val doc = requestAsyncChapters(mangaUrl, document)
+		val doc = requestAsyncChapters(mangaUrl)
 
-		val chaptersFromAsync = parseChapterList(doc.select(selectChapter), sourceOrderFallback = true)
+		val chaptersFromAsync = parseChapterList(selectChapterItems(doc), sourceOrderFallback = true)
 		val chapters = if (chaptersFromAsync.isNotEmpty()) {
 			chaptersFromAsync
 		} else {
-			parseChapterList(document.body().select(selectChapter), sourceOrderFallback = true)
+			parseChapterList(selectChapterItems(document), sourceOrderFallback = true)
 		}
 		if (chapters.isNotEmpty()) {
 			synchronized(chaptersCache) {
@@ -128,38 +125,9 @@ internal class HentaiOrigines(context: MangaLoaderContext) :
 		}
 	}
 
-	private suspend fun requestAsyncChapters(mangaUrl: String, document: Document): Document {
-		val mangaId = document.select("div#manga-chapters-holder").attr("data-id").trim()
-
-		if (preferAdminAjaxChapters && mangaId.isNotEmpty()) {
-			val adminAjaxDoc = requestChaptersViaAdminAjax(mangaId)
-			if (adminAjaxDoc.select(selectChapter).isNotEmpty()) {
-				return adminAjaxDoc
-			}
-		}
-
+	private suspend fun requestAsyncChapters(mangaUrl: String): Document {
 		val ajaxUrl = mangaUrl.toAbsoluteUrl(domain).removeSuffix("/") + "/ajax/chapters/"
-		val ajaxDoc = webClient.httpPost(ajaxUrl, emptyMap()).parseHtml()
-		if (ajaxDoc.select(selectChapter).isNotEmpty()) {
-			preferAdminAjaxChapters = false
-			return ajaxDoc
-		}
-
-		if (!preferAdminAjaxChapters && mangaId.isNotEmpty()) {
-			val adminAjaxDoc = requestChaptersViaAdminAjax(mangaId)
-			if (adminAjaxDoc.select(selectChapter).isNotEmpty()) {
-				preferAdminAjaxChapters = true
-				return adminAjaxDoc
-			}
-		}
-
-		return ajaxDoc
-	}
-
-	private suspend fun requestChaptersViaAdminAjax(mangaId: String): Document {
-		val adminAjaxUrl = "https://$domain/wp-admin/admin-ajax.php"
-		val postData = postDataReq + mangaId
-		return webClient.httpPost(adminAjaxUrl, postData).parseHtml()
+		return webClient.httpPost(ajaxUrl, emptyMap()).parseHtml()
 	}
 
 	private fun parseUploadDate(raw: String?): Long {
@@ -236,9 +204,15 @@ internal class HentaiOrigines(context: MangaLoaderContext) :
 		return url.substringBefore('?').removeSuffix("/")
 	}
 
+	private fun selectChapterItems(document: Document): List<Element> {
+		return document.selectFirst(CHAPTERS_HOLDER_SELECTOR)?.select(selectChapter)
+			?: document.select(selectChapter)
+	}
+
 	private companion object {
 		private const val CHAPTERS_CACHE_SIZE = 100
 		private const val PAGES_CACHE_SIZE = 200
+		private const val CHAPTERS_HOLDER_SELECTOR = "div#manga-chapters-holder"
 		private const val SECOND_MILLIS = 1_000L
 		private const val MINUTE_MILLIS = 60_000L
 		private const val HOUR_MILLIS = 3_600_000L

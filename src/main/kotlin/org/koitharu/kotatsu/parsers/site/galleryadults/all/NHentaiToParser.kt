@@ -34,7 +34,16 @@ internal class NHentaiToParser(context: MangaLoaderContext) :
 		)
 
 	override suspend fun getFilterOptions() = super.getFilterOptions().copy(
-		availableLocales = setOf(Locale.ENGLISH, Locale.JAPANESE, Locale.CHINESE),
+		availableLocales = setOf(
+			Locale.ENGLISH,
+			Locale.JAPANESE,
+			Locale.CHINESE,
+			Locale("es"),
+			Locale.FRENCH,
+			Locale.KOREAN,
+			Locale("ru"),
+			Locale.ITALIAN,
+		)
 	)
 
 	override suspend fun getListPage(page: Int, order: SortOrder, filter: MangaListFilter): List<Manga> {
@@ -43,8 +52,12 @@ internal class NHentaiToParser(context: MangaLoaderContext) :
 			append(domain)
 			when {
 				filter.tags.isEmpty() && filter.locale == null -> {
+					append("/go/?")
+				}
+
+				!filter.query.isNullOrEmpty() -> {
 					append("/search/?q=")
-					append(if (filter.query.isNullOrEmpty()) "" else filter.query.urlEncoded())
+					append(filter.query.urlEncoded())
 					append("&")
 				}
 
@@ -60,10 +73,10 @@ internal class NHentaiToParser(context: MangaLoaderContext) :
 						append("/?")
 					} else if (filter.locale != null) {
 						append("/language/")
-						append(filter.locale.toLanguagePath())
+						append(lang.toLanguagePath())
 						append("/?")
 					} else {
-						append("/?")
+						append("/go/?")
 					}
 				}
 			}
@@ -111,5 +124,11 @@ internal class NHentaiToParser(context: MangaLoaderContext) :
 			title = name.toTitleCase(sourceLocale),
 			source = source,
 		)
+	}
+
+	override fun Locale.toLanguagePath() = when (language) {
+		"es" -> "spanish"
+		"ru" -> "russian"
+		else -> getDisplayLanguage(Locale.ENGLISH).lowercase()
 	}
 }
