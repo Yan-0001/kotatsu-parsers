@@ -523,7 +523,8 @@ internal abstract class MadaraParser(
 				url = href,
 				publicUrl = href.toAbsoluteUrl(div.host ?: domain),
 				coverUrl = div.selectFirst("img")?.src(),
-				title = (summary?.selectFirst("h3, h4") ?: div.selectFirst(".manga-name, .post-title"))?.text()
+				title = (summary?.selectFirst("h3, h4")
+					?: div.selectFirst(".manga-name, .post-title h2 a, .post-title"))?.text()
 					.orEmpty(),
 				altTitles = emptySet(),
 				rating = div.selectFirst("span.total_votes")?.ownText()?.toFloatOrNull()?.div(5f) ?: RATING_UNKNOWN,

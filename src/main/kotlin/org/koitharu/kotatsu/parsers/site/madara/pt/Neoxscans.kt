@@ -11,7 +11,7 @@ import java.text.SimpleDateFormat
 
 @MangaSourceParser("NEOX_SCANS", "MangaLivre", "pt")
 internal class Neoxscans(context: MangaLoaderContext) :
-	MadaraParser(context, MangaParserSource.NEOX_SCANS, "mangalivre.net", 18) {
+	MadaraParser(context, MangaParserSource.NEOX_SCANS, "mangalivre.tv", 18) {
 
 	override val withoutAjax = true
 	override val datePattern = "dd/MM/yyyy"
