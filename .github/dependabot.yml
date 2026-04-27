@@ -22,7 +22,7 @@ updates:
             # (Kotlin+KSP must move together, JUnit 6 forces JVM 17, etc.). Keep them
             # out of the auto-PR queue; open them manually when we're ready to validate.
             -   dependency-name: "*"
-                update-types: [ "version-update:semver-major" ]\
+                update-types: [ "version-update:semver-major" ]
             -   dependency-name: "org.jsoup:jsoup"
 
     # GitHub Actions used by workflows in .github/workflows
