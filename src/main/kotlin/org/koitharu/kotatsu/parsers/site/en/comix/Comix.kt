@@ -50,7 +50,8 @@ internal class Comix(context: MangaLoaderContext) :
 	)
 
 	override suspend fun getFilterOptions() = MangaListFilterOptions(
-		availableTags = fetchAvailableTags()
+		availableTags = fetchAvailableTags(),
+		availableContentRating = EnumSet.of(ContentRating.ADULT),
 	)
 
 	// -------------------------
@@ -79,7 +80,7 @@ internal class Comix(context: MangaLoaderContext) :
 				filter.tagsExclude.forEach { addQueryParameter("genres[]", "-${it.key}") }
 			}
 
-			if (filter.tags.isEmpty() && filter.tagsExclude.isEmpty()) {
+			if (filter.contentRating.isEmpty()) {
 				nsfwGenreIds.forEach { addQueryParameter("genres[]", "-$it") }
 			}
 
