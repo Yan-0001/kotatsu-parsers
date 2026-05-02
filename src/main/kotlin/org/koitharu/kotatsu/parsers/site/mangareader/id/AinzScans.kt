@@ -46,7 +46,7 @@ internal class AinzScans(context: MangaLoaderContext) :
                 authors = emptySet(),
                 state = null,
                 source = source,
-                contentRating = if (j.getInt("is_adult") == 1) ContentType.ADULT else null,
+                contentRating = if (j.getInt("is_adult") == 1) ContentType.HENTAI else null,
             )
         }
     }
