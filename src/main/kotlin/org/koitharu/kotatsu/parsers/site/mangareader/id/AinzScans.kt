@@ -2,6 +2,7 @@ package org.koitharu.kotatsu.parsers.site.mangareader.id
 
 import org.koitharu.kotatsu.parsers.MangaLoaderContext
 import org.koitharu.kotatsu.parsers.MangaSourceParser
+import org.koitharu.kotatsu.parsers.model.ContentRating
 import org.koitharu.kotatsu.parsers.model.ContentType
 import org.koitharu.kotatsu.parsers.model.Manga
 import org.koitharu.kotatsu.parsers.model.MangaListFilter
@@ -46,7 +47,7 @@ internal class AinzScans(context: MangaLoaderContext) :
                 authors = emptySet(),
                 state = null,
                 source = source,
-                contentRating = if (j.getInt("is_adult") == 1) ContentType.HENTAI else null,
+                contentRating = if (j.getInt("is_adult") == 1) ContentRating.ADULT else null,
             )
         }
     }
