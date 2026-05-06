@@ -7,9 +7,9 @@ import org.koitharu.kotatsu.parsers.MangaSourceParser
 import org.koitharu.kotatsu.parsers.core.PagedMangaParser
 import org.koitharu.kotatsu.parsers.config.ConfigKey
 import org.koitharu.kotatsu.parsers.model.*
-import org.koitharu.kotatsu.parsers.util.Jsoup.attrAsRelativeUrl
-import org.koitharu.kotatsu.parsers.util.Jsoup.src
-import org.koitharu.kotatsu.parsers.util.Jsoup.selectFirstOrThrow
+import org.koitharu.kotatsu.parsers.util.attrAsRelativeUrl
+import org.koitharu.kotatsu.parsers.util.parseHtml
+import org.koitharu.kotatsu.parsers.util.src
 
 @InternalParsersApi
 @MangaSourceParser(
@@ -25,7 +25,7 @@ class QiManhwaParser(
 
     override val configKeyDomain = ConfigKey.Domain("qimanhwa.com")
 
-    override val availableSortOrders: Set<SortOrder> = setOf(SortOrder.LATEST)
+    override val availableSortOrders: Set<SortOrder> = setOf(SortOrder.NEWEST)
 
     override val filterCapabilities = MangaListFilterCapabilities(
         isSearchSupported = true
@@ -91,7 +91,7 @@ class QiManhwaParser(
             MangaPage(
                 id = generateUid(imageUrl),
                 url = imageUrl,
-                pageNumber = 0 // Indexing handled by list order
+                pageNumber = 0 // Indexing inode handled by list order
             )
         }
     }
