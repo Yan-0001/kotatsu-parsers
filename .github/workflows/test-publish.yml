@@ -1,0 +1,47 @@
+name: Test Build & Upload
+
+on:
+    push:
+        branches:
+            - my-publish
+
+jobs:
+    test-publish:
+        runs-on: ubuntu-latest
+        steps:
+            -   name: Checkout repository 🌏
+                uses: actions/checkout@v4
+                with:
+                    fetch-depth: 0
+
+            -   name: Set up Java environment 🔧
+                uses: actions/setup-java@v4
+                with:
+                    java-version: '17'
+                    distribution: 'temurin'
+
+            -   name: Set up Gradle environment 📦
+                uses: gradle/actions/setup-gradle@v3
+
+            -   name: Setup Android SDK 🚀
+                uses: android-actions/setup-android@v4
+
+            -   name: Run assemble tasks 🚀
+                run: ./gradlew assemble --rerun-tasks
+
+            -   name: Process library with d8 🚀
+                run: |
+                    LIB_PATH=build/libs/kotatsu-parsers.jar
+                    D8_PATH=build/libs/plugin.jar
+                    if [ -f $LIB_PATH ]; then
+                        d8 --release $LIB_PATH --output $D8_PATH
+                    else
+                        echo "ℹ️ Pre-compiled library not found, skipping D8 step..."
+                    fi
+                continue-on-error: true
+
+            -   name: Upload artifact 🌐
+                uses: actions/upload-artifact@v4
+                with:
+                    name: kotatsu-parsers-test-artifact
+                    path: build/libs/plugin.jar
