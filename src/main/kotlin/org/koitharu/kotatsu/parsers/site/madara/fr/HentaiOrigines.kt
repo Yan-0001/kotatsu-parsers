@@ -32,6 +32,7 @@ internal class HentaiOrigines(context: MangaLoaderContext) :
 	override val selectChapter = "li.wp-manga-chapter, div.chapter-item"
 
 	private val chapterDateFormatFr = ThreadLocal.withInitial { SimpleDateFormat(datePattern, sourceLocale) }
+	private val chapterDateFormatFrDayFirst = ThreadLocal.withInitial { SimpleDateFormat("d MMMM yyyy", sourceLocale) }
 	private val chapterDateFormatEn = ThreadLocal.withInitial { SimpleDateFormat(datePattern, Locale.ENGLISH) }
 	private val chapterDateTimeFormatIso = ThreadLocal.withInitial { SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.US) }
 
@@ -108,8 +109,7 @@ internal class HentaiOrigines(context: MangaLoaderContext) :
 			val a = li.selectFirstOrThrow("a")
 			val href = a.attrAsRelativeUrl("href")
 			val chapterTitle = (a.selectFirst("p")?.text() ?: a.ownText()).trim().ifEmpty { null }
-			val dateText = li.selectFirst("a.c-new-tag")?.attr("title")
-				?: li.selectFirst(selectDate)?.text()
+			val dateText = extractDateText(li)
 
 			MangaChapter(
 				id = generateUid(href),
@@ -156,10 +156,21 @@ internal class HentaiOrigines(context: MangaLoaderContext) :
 		val parsedFr = chapterDateFormatFr.get().parseSafe(normalizedRaw)
 		if (parsedFr != 0L) return parsedFr
 
+		val parsedFrDayFirst = chapterDateFormatFrDayFirst.get().parseSafe(normalizedRaw)
+		if (parsedFrDayFirst != 0L) return parsedFrDayFirst
+
 		val parsedEn = chapterDateFormatEn.get().parseSafe(normalizedRaw)
 		if (parsedEn != 0L) return parsedEn
 
 		return chapterDateTimeFormatIso.get().parseSafe(normalizedRaw)
+	}
+
+	private fun extractDateText(li: Element): String? {
+		return li.selectFirst("a.c-new-tag")?.attr("title")?.trim()?.ifEmpty { null }
+			?: li.selectFirst(".timediff a[title]")?.attr("title")?.trim()?.ifEmpty { null }
+			?: li.selectFirst(".timediff i")?.text()?.trim()?.ifEmpty { null }
+			?: li.selectFirst(".chapter-release-date > i")?.text()?.trim()?.ifEmpty { null }
+			?: li.selectFirst(selectDate)?.text()?.trim()?.ifEmpty { null }
 	}
 
 	private fun startOfDay(daysAgo: Int): Long {

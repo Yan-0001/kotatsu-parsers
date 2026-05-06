@@ -32,6 +32,7 @@ internal class MangasOrigines(context: MangaLoaderContext) :
 	override val selectChapter = "li.wp-manga-chapter, div.chapter-item"
 
 	private val chapterDateFormatFr = ThreadLocal.withInitial { SimpleDateFormat(datePattern, sourceLocale) }
+	private val chapterDateFormatFrDayFirst = ThreadLocal.withInitial { SimpleDateFormat("d MMMM yyyy", sourceLocale) }
 	private val chapterDateFormatEn = ThreadLocal.withInitial { SimpleDateFormat(datePattern, Locale.ENGLISH) }
 	private val chaptersCache = object : LinkedHashMap<String, List<MangaChapter>>(32, 0.75f, true) {
 		override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, List<MangaChapter>>?): Boolean {
@@ -108,8 +109,7 @@ internal class MangasOrigines(context: MangaLoaderContext) :
 			val a = li.selectFirstOrThrow("a")
 			val href = a.attrAsRelativeUrl("href")
 			val chapterTitle = (a.selectFirst("p")?.text() ?: a.ownText()).trim().ifEmpty { null }
-			val dateText = li.selectFirst("a.c-new-tag")?.attr("title")
-				?: li.selectFirst(selectDate)?.text()
+			val dateText = extractDateText(li)
 
 			MangaChapter(
 				id = generateUid(href),
@@ -148,7 +148,20 @@ internal class MangasOrigines(context: MangaLoaderContext) :
 			return startOfDay(daysAgo = 0)
 		}
 		val parsedFr = chapterDateFormatFr.get().parseSafe(normalizedRaw)
-		return if (parsedFr != 0L) parsedFr else chapterDateFormatEn.get().parseSafe(normalizedRaw)
+		if (parsedFr != 0L) return parsedFr
+
+		val parsedFrDayFirst = chapterDateFormatFrDayFirst.get().parseSafe(normalizedRaw)
+		if (parsedFrDayFirst != 0L) return parsedFrDayFirst
+
+		return chapterDateFormatEn.get().parseSafe(normalizedRaw)
+	}
+
+	private fun extractDateText(li: Element): String? {
+		return li.selectFirst("a.c-new-tag")?.attr("title")?.trim()?.ifEmpty { null }
+			?: li.selectFirst(".timediff a[title]")?.attr("title")?.trim()?.ifEmpty { null }
+			?: li.selectFirst(".timediff i")?.text()?.trim()?.ifEmpty { null }
+			?: li.selectFirst(".chapter-release-date > i")?.text()?.trim()?.ifEmpty { null }
+			?: li.selectFirst(selectDate)?.text()?.trim()?.ifEmpty { null }
 	}
 
 	private fun startOfDay(daysAgo: Int): Long {

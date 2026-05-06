@@ -39,7 +39,9 @@ internal class ScanHentaiMenu(context: MangaLoaderContext) :
 	override val selectTestAsync = "#manga-chapters-holder li.wp-manga-chapter"
 
 	private val chapterDateFormatFr = ThreadLocal.withInitial { SimpleDateFormat(datePattern, sourceLocale) }
+	private val chapterDateFormatFrDayFirst = ThreadLocal.withInitial { SimpleDateFormat("d MMMM yyyy", sourceLocale) }
 	private val chapterDateFormatEn = ThreadLocal.withInitial { SimpleDateFormat(datePattern, Locale.ENGLISH) }
+	private val chapterDateFormatShort = ThreadLocal.withInitial { SimpleDateFormat("dd/MM/yy", sourceLocale) }
 
 	private val chaptersCache = object : LinkedHashMap<String, List<MangaChapter>>(32, 0.75f, true) {
 		override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, List<MangaChapter>>?): Boolean {
@@ -206,8 +208,7 @@ internal class ScanHentaiMenu(context: MangaLoaderContext) :
 			val chapterTitle = (a.selectFirst("p")?.text() ?: a.ownText()).trim().ifEmpty { null }
 			val chapterTitleLower = chapterTitle?.lowercase(Locale.ROOT).orEmpty()
 			val hrefLower = href.lowercase(Locale.ROOT)
-			val dateText = li.selectFirst("a.c-new-tag")?.attr("title")
-				?: li.selectFirst(selectDate)?.text()
+			val dateText = extractDateText(li)
 
 			MangaChapter(
 				id = generateUid(href),
@@ -233,7 +234,21 @@ internal class ScanHentaiMenu(context: MangaLoaderContext) :
 		val normalizedRaw = raw?.trim()?.replace('\u00a0', ' ')?.ifEmpty { return 0L } ?: return 0L
 		val frDate = parseChapterDate(chapterDateFormatFr.get(), normalizedRaw)
 		if (frDate != 0L) return frDate
+
+		val frDayFirstDate = parseChapterDate(chapterDateFormatFrDayFirst.get(), normalizedRaw)
+		if (frDayFirstDate != 0L) return frDayFirstDate
+
 		return parseChapterDate(chapterDateFormatEn.get(), normalizedRaw)
+			.takeIf { it != 0L }
+			?: parseChapterDate(chapterDateFormatShort.get(), normalizedRaw)
+	}
+
+	private fun extractDateText(li: Element): String? {
+		return li.selectFirst("a.c-new-tag")?.attr("title")?.trim()?.ifEmpty { null }
+			?: li.selectFirst(".timediff a[title]")?.attr("title")?.trim()?.ifEmpty { null }
+			?: li.selectFirst(".timediff i")?.text()?.trim()?.ifEmpty { null }
+			?: li.selectFirst(".chapter-release-date > i")?.text()?.trim()?.ifEmpty { null }
+			?: li.selectFirst(selectDate)?.text()?.trim()?.ifEmpty { null }
 	}
 
 	private fun parseChapterNumber(
