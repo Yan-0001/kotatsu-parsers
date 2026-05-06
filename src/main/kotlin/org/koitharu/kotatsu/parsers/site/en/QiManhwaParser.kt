@@ -3,7 +3,9 @@ package org.koitharu.kotatsu.parsers.site.en
 import org.jsoup.nodes.Element
 import org.koitharu.kotatsu.parsers.InternalParsersApi
 import org.koitharu.kotatsu.parsers.MangaLoaderContext
+import org.koitharu.kotatsu.parsers.MangaSourceParser
 import org.koitharu.kotatsu.parsers.core.PagedMangaParser
+import org.koitharu.kotatsu.parsers.config.ConfigKey
 import org.koitharu.kotatsu.parsers.model.*
 import org.koitharu.kotatsu.parsers.util.Jsoup.attrAsRelativeUrl
 import org.koitharu.kotatsu.parsers.util.Jsoup.src
@@ -23,6 +25,14 @@ class QiManhwaParser(
 
     override val configKeyDomain = ConfigKey.Domain("qimanhwa.com")
 
+    override val availableSortOrders: Set<SortOrder> = setOf(SortOrder.LATEST)
+
+    override val filterCapabilities = MangaListFilterCapabilities(
+        isSearchSupported = true
+    )
+
+    override suspend fun getFilterOptions(): MangaListFilterOptions = MangaListFilterOptions()
+
     override suspend fun getListPage(page: Int, order: SortOrder, filter: MangaListFilter): List<Manga> {
         val url = if (filter.query.isNullOrEmpty()) {
             "https://$domain/browse?page=$page"
@@ -39,7 +49,6 @@ class QiManhwaParser(
                 id = generateUid(relativeUrl),
                 title = element.text(),
                 publicUrl = relativeUrl.toAbsoluteUrl(domain),
-                // Other fields like cover can be extracted from child img tags
             )
         }
     }
