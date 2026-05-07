@@ -157,13 +157,7 @@ internal class Comix(context: MangaLoaderContext) :
 			?: throw ParseException("Invalid manga URL", manga.url)
 		val mangaSlug = manga.url.removePrefix("/title/")
 
-		val detailsUrl = "$apiBaseUrl/manga/$hid".toHttpUrl().newBuilder()
-			.addQueryParameter("includes[]", "author")
-			.addQueryParameter("includes[]", "artist")
-			.addQueryParameter("includes[]", "genre")
-			.addQueryParameter("includes[]", "theme")
-			.addQueryParameter("includes[]", "demographic")
-			.build()
+		val detailsUrl = "$apiBaseUrl/manga/$hid".toHttpUrl().newBuilder().build()
 		val detailsDeferred = async { webClient.httpGet(detailsUrl).parseJson() }
 		val chaptersDeferred = async { getChapters(hid, mangaSlug) }
 
@@ -175,16 +169,19 @@ internal class Comix(context: MangaLoaderContext) :
 			val updated = parseMangaFromJson(result)
 
 			val authors = LinkedHashSet<String>()
-			result.optJSONArray("authors")?.let { arr ->
-				for (i in 0 until arr.length()) {
-					arr.optJSONObject(i)?.optString("title")?.nullIfEmpty()?.let { authors.add(it) }
+			fun extractNames(field: String) {
+				result.optJSONArray(field)?.let { arr ->
+					for (i in 0 until arr.length()) {
+						arr.optJSONObject(i)?.optString("title")?.nullIfEmpty()?.let { authors.add(it) }
+					}
 				}
 			}
-			result.optJSONArray("artists")?.let { arr ->
-				for (i in 0 until arr.length()) {
-					arr.optJSONObject(i)?.optString("title")?.nullIfEmpty()?.let { authors.add(it) }
-				}
-			}
+			// New field names (preferred)
+			extractNames("authors")
+			extractNames("artists")
+			// Old field names (fallback)
+			extractNames("author")
+			extractNames("artist")
 
 			val tags = mutableSetOf<MangaTag>()
 			fun addTags(field: String) {
@@ -197,11 +194,22 @@ internal class Comix(context: MangaLoaderContext) :
 					}
 				}
 			}
-			addTags("genres"); addTags("tags"); addTags("demographics")
+			// New field names (preferred)
+			addTags("genres")
+			addTags("tags")
+			addTags("demographics")
+			addTags("formats")
+			// Old field names (fallback)
+			addTags("genre")
+			addTags("theme")
+			addTags("demographic")
 
 			val ratedAvg = result.optDouble("ratedAvg", 0.0)
 			val synopsis = result.optString("synopsis", "")
+			// Prefer altTitles, fallback to alt_titles (old field name)
 			val altTitles = result.optJSONArray("altTitles")?.let { arr ->
+				(0 until arr.length()).map { arr.getString(it) }
+			} ?: result.optJSONArray("alt_titles")?.let { arr ->
 				(0 until arr.length()).map { arr.getString(it) }
 			} ?: emptyList()
 
